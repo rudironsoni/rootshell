@@ -1,13 +1,19 @@
 import SwiftUI
 
 extension MainView {
-    func horizontalTabHeader(geometry: GeometryProxy, resolvedTheme: ResolvedTabBarTheme) -> some View {
+    var tabHeaderIsInsideTerminalColumn: Bool {
+        UIDevice.current.userInterfaceIdiom == .phone && edgeSidebarViewportIsWide
+            && !duoLayout.hasHinge && showsHorizontalTabHeader
+    }
+
+    func horizontalTabHeader(geometry: GeometryProxy, resolvedTheme: ResolvedTabBarTheme, inTerminalColumn: Bool = false) -> some View {
         let rowWidth = terminalRowViewportWidth > 0 ? terminalRowViewportWidth : geometry.size.width
         let columns = terminalRowColumns(width: rowWidth)
         let cardGap = roundedPanes ? PaneCardStyle.gap : 0
-        let followsTerminalColumn = usesPinnedWideEdgeSidebarLayout
-        let headerWidth = followsTerminalColumn ? columns.terminal : geometry.size.width
-        let terminalLeadingInset = followsTerminalColumn ? cardGap + leadingWidth(in: columns) : 0
+        let followsTerminalColumn = usesPinnedWideEdgeSidebarLayout && (!isPhone || edgeSidebarViewportIsWide)
+        let headerWidth = inTerminalColumn ? geometry.size.width
+            : (followsTerminalColumn ? columns.terminal : geometry.size.width)
+        let terminalLeadingInset = followsTerminalColumn && !inTerminalColumn ? cardGap + leadingWidth(in: columns) : 0
         return GeometryReader { terminalHeaderGeometry in
             let cardInset = integratedCardLeadingInset(windowWidth: terminalHeaderGeometry.size.width)
             let surfaceFill = integratedTabSurfaceFill(theme: resolvedTheme)

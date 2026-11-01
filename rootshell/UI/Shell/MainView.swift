@@ -537,7 +537,7 @@ struct MainView: View {
                     // Top toolbar spacer when tab bar is hidden (Catalyst only)
                     catalystTabBarSpacer(geometry: geometry)
 
-                    if showsHorizontalTabHeader {
+                    if showsHorizontalTabHeader && !tabHeaderIsInsideTerminalColumn {
                         GeometryReader { headerGeometry in
                             horizontalTabHeader(geometry: headerGeometry, resolvedTheme: resolvedTheme)
                         }

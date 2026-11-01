@@ -726,7 +726,7 @@ final class TerminalKeyboardAccessoryController: NSObject {
         #if os(visionOS) || targetEnvironment(macCatalyst)
         return nil
         #else
-        guard let host, host.keyboardIsFirstResponder,
+        guard let host, host.keyboardIsFirstResponder || retainsToolbarForSidebar,
               let window = host.keyboardHostView.window,
               let accessory = presentedToolbarView,
               let accessoryWindow = accessory.window,
@@ -1037,7 +1037,7 @@ final class TerminalKeyboardAccessoryController: NSObject {
     }
 
     #if !os(visionOS) && !targetEnvironment(macCatalyst)
-    /// Keep the phone toolbar inside its terminal column in both input modes.
+    /// Use the full portrait width and the terminal column in landscape.
     /// The Duo also uses this host to place the row below its keyboard fold.
     private var windowToolbarFrame: CGRect? {
         guard !retainsToolbarForSidebar || !hasPresentedUIKitModal else { return nil }
@@ -1048,7 +1048,8 @@ final class TerminalKeyboardAccessoryController: NSObject {
            let columnFrame = terminalColumnFrameInScreen {
             // The pane moves during a tab swipe; the terminal column does not.
             let viewport = window.convert(columnFrame, from: window.screen.coordinateSpace)
-            let column = viewport.intersection(window.bounds)
+            let column = window.bounds.height >= window.bounds.width
+                ? window.bounds : viewport.intersection(window.bounds)
             guard !column.isNull, column.width > 0 else { return nil }
             let height = accessory.toolbarView.intrinsicContentSize.height
             let keyboard = window.convert(KeyboardTracker.shared.keyboardFrame, from: window.screen.coordinateSpace)

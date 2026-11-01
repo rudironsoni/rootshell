@@ -1651,15 +1651,25 @@ extension MainView {
             }
             #endif
 
-            applyDuoChrome(terminalContentZStack(
-                geometry: geometry,
-                width: terminalWidth,
-                effectLeadingExtension: backgroundEffectIncludesPinnedSidebar
-                    && backgroundSidebarEffectID == BackgroundEffectSelection.followTerminalID
-                    && columns.leadingEdgeSidebar > 0
-                    ? columns.leadingEdgeSidebar
-                    : 0
-            ), inTerminalColumn: true)
+            VStack(spacing: 0) {
+                if tabHeaderIsInsideTerminalColumn {
+                    GeometryReader { headerGeometry in
+                        horizontalTabHeader(geometry: headerGeometry, resolvedTheme: theme, inTerminalColumn: true)
+                    }
+                    .frame(height: TabMetrics.tabBarHeight)
+                }
+                GeometryReader { columnGeometry in
+                    applyDuoChrome(terminalContentZStack(
+                        geometry: tabHeaderIsInsideTerminalColumn ? columnGeometry : geometry,
+                        width: terminalWidth,
+                        effectLeadingExtension: backgroundEffectIncludesPinnedSidebar
+                            && backgroundSidebarEffectID == BackgroundEffectSelection.followTerminalID
+                            && columns.leadingEdgeSidebar > 0
+                            ? columns.leadingEdgeSidebar
+                            : 0
+                    ), inTerminalColumn: true)
+                }
+            }
             .frame(width: terminalWidth)
             .onGeometryChange(for: TerminalToolbarViewport.self) { [weak toolbarTab] proxy in
                 let pane = toolbarTab?.focusedPane?.asTerminal
@@ -1871,6 +1881,7 @@ extension MainView {
         theme: ResolvedSheetTheme
     ) -> some View {
         let innerGap: CGFloat = usesPinnedWideEdgeSidebarLayout && roundedPanes ? PaneCardStyle.gap : 0
+        let portraitClearance = isPhone && !edgeSidebarViewportIsWide ? dockedSidebarBottomClearance() : 0
         let card = HStack(spacing: 0) {
             if side == .trailing {
                 edgePinnedSidebarDivider(side: .trailing, geometry: geometry)
@@ -1879,7 +1890,7 @@ extension MainView {
                 side: side,
                 sheetTheme: theme,
                 isDocked: true,
-                dockedBottomClearance: dockedSidebarBottomClearance()
+                dockedBottomClearance: portraitClearance > 0 ? 0 : dockedSidebarBottomClearance()
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .paneCardClip(roundedPanes)
@@ -1918,6 +1929,8 @@ extension MainView {
                     dockedTabSidebarBackground(theme: theme)
                         .ignoresSafeArea(.container, edges: side == .leading ? .leading : .trailing)
                 }
+                .padding(.bottom, portraitClearance)
+                .padding(.top, tabHeaderIsInsideTerminalColumn && roundedPanes ? PaneCardStyle.gap : 0)
         } else {
             card
         }
@@ -2003,11 +2016,20 @@ extension MainView {
         guard terminals.indices.contains(selectedTabIndex),
               let pane = terminals[selectedTabIndex].focusedPane,
               let window = pane.window else { return 0 }
+        let portraitToolbarCoverage: CGFloat
+        if isPhone, window.bounds.height >= window.bounds.width,
+           let accessoryFrame = pane.keyboardAccessoryFrameInScreen {
+            let frame = window.convert(accessoryFrame, from: window.screen.coordinateSpace)
+            portraitToolbarCoverage = frame.intersects(window.bounds)
+                ? max(0, window.bounds.maxY - frame.minY + PaneCardStyle.gap) : 0
+        } else {
+            portraitToolbarCoverage = 0
+        }
         let touchKeyboardFrame = pane.dockedTouchKeyboardFrameInScreen
         let keyboardFrame = window.convert(touchKeyboardFrame ?? effectManager.keyboardFrame,
                                            from: window.screen.coordinateSpace)
         if (touchKeyboardFrame != nil || TerminalKeyboardGeometry.isDocked(keyboard: keyboardFrame, container: window.bounds)) {
-            let coverage = TerminalKeyboardGeometry.overlapHeight(keyboard: keyboardFrame, container: window.bounds)
+            let coverage = max(portraitToolbarCoverage, TerminalKeyboardGeometry.overlapHeight(keyboard: keyboardFrame, container: window.bounds))
             guard coverage > 0 else { return 0 }
             // Rounded cards end one card gap above the screen edge, not at the strip.
             let stripClearance = paneCardsEnterHomeIndicatorStrip ? PaneCardStyle.gap : windowSafeAreaInsets.bottom
@@ -2016,9 +2038,11 @@ extension MainView {
         // Not gated on the keyboard: the reservation itself requires the
         // pane to hold first responder, so it is 0 whenever no toolbar is
         // docked at the bottom edge.
-        if pane.asTerminal?.keyboardAccessoryController.toolbarFollowsTerminalViewport == true { return 0 }
+        if pane.asTerminal?.keyboardAccessoryController.toolbarFollowsTerminalViewport == true,
+           portraitToolbarCoverage == 0 { return 0 }
         guard terminals.indices.contains(selectedTabIndex) else { return 0 }
-        return terminals[selectedTabIndex].focusedPane?.reservedKeyboardToolbarHeightAtBottom ?? 0
+        return max(max(0, portraitToolbarCoverage - windowSafeAreaInsets.bottom),
+                   terminals[selectedTabIndex].focusedPane?.reservedKeyboardToolbarHeightAtBottom ?? 0)
         #endif
     }
 

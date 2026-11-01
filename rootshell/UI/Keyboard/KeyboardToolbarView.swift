@@ -631,7 +631,7 @@ class KeyboardToolbarView: UIView {
         if isEmbeddedPreview { return (0, 0) }
         let left = isPhoneLandscape ? max(safeAreaInsets.left, window?.safeAreaInsets.left ?? 0) + 2 : 0
         let right = isPhoneLandscape ? max(safeAreaInsets.right, window?.safeAreaInsets.right ?? 0) + 2 : 0
-        guard followsTerminalViewport, let frame = terminalViewportInScreen, let window else {
+        guard followsTerminalViewport, isPhoneLandscape, let frame = terminalViewportInScreen, let window else {
             return (left, right)
         }
         let local = convert(frame, from: window.screen.coordinateSpace)
